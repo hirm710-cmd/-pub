@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ja" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>デジタル番号くじ引き</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind Configuration for Custom Colors -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Font Awesome for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
+    @keyframes pulse-slow {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+    .animate-pulse-slow {
+      animation: pulse-slow 2s infinite ease-in-out;
+    }
+    /* スクロールバーのカスタマイズ */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-full flex flex-col transition-colors duration-200">
+
+  <!-- ヘッダー -->
+  <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 py-4 px-6 sticky top-0 z-10 shadow-sm transition-colors duration-200">
+    <div class="max-w-6xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <div class="bg-gradient-to-tr from-emerald-500 to-teal-500 text-white p-2 rounded-xl shadow-md">
+          <i class="fa-solid fa-ticket-simple text-xl"></i>
+        </div>
+        <h1 class="text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-400 dark:to-teal-400 bg-clip-text text-transparent">
+          デジタルくじ引き
+        </h1>
+      </div>
+      
+      <!-- テーマ切り替え & リセット -->
+      <div class="flex items-center gap-3">
+        <button id="themeToggleBtn" class="p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors" title="ダークモード切り替え">
+          <i id="themeIcon" class="fa-solid fa-moon text-slate-600 dark:text-yellow-400"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="flex-grow max-w-6xl w-full mx-auto px-4 py-6 md:py-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+    
+    <!-- 左側：抽選メインエリア (7カラム) -->
+    <section class="lg:col-span-7 flex flex-col justify-between bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 md:p-8 shadow-sm relative overflow-hidden transition-colors duration-200">
+      
+      <!-- ステータス表示 -->
+      <div class="flex justify-between items-center mb-6">
+        <span class="text-xs md:text-sm font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Lottery Box</span>
+        <div class="flex gap-2 text-sm bg-slate-100 dark:bg-slate-700 py-1 px-3 rounded-full font-medium">
+          <span class="text-slate-500 dark:text-slate-400">残りの番号:</span>
+          <span id="remainingCount" class="text-emerald-600 dark:text-emerald-400 font-bold">100 / 100</span>
+        </div>
+      </div>
+
+      <!-- 番号ディスプレイ -->
+      <div class="flex-grow flex flex-col justify-center items-center py-8 md:py-14 relative z-10">
+        <!-- 円形のディスプレイ -->
+        <div id="displayContainer" class="w-64 h-64 md:w-80 md:h-80 rounded-full border-8 border-slate-100 dark:border-slate-700 bg-gradient-to-b from-slate-50 to-white dark:from-slate-800 dark:to-slate-900 shadow-inner flex flex-col justify-center items-center relative animate-pulse-slow transition-all duration-300">
+          
+          <!-- 装飾用の光るエフェクト -->
+          <div id="glowEffect" class="absolute inset-0 rounded-full bg-emerald-500/0 transition-all duration-500"></div>
+
+          <div id="subLabel" class="text-sm font-semibold text-slate-400 dark:text-slate-500 mb-2">準備はいいですか？</div>
+          <div id="numberDisplay" class="text-7xl md:text-9xl font-extrabold tracking-tight text-slate-700 dark:text-white transition-all duration-150">
+            ?
+          </div>
+          <div id="stateBadge" class="mt-4 px-3 py-1 rounded-full text-xs font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors">
+            WAITING
+          </div>
+        </div>
+      </div>
+
+      <!-- アクションボタン -->
+      <div class="mt-6 flex flex-col gap-3">
+        <button id="drawBtn" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold text-xl py-5 rounded-2xl shadow-lg shadow-emerald-500/20 active:scale-98 transition-all flex items-center justify-center gap-3">
+          <i class="fa-solid fa-play"></i>
+          <span>くじを引く！</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 右側：コントロール・履歴エリア (5カラム) -->
+    <section class="lg:col-span-5 flex flex-col gap-6">
+      
+      <!-- 設定カード -->
+      <div class="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm transition-colors duration-200">
+        <div class="flex items-center gap-2 mb-4">
+          <i class="fa-solid fa-sliders text-emerald-500"></i>
+          <h2 class="text-lg font-bold">くじの設定</h2>
+        </div>
+
+        <div class="space-y-4">
+          <!-- 範囲設定 -->
+          <div>
+            <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">抽選する番号の範囲</label>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <span class="text-xs text-slate-400">最小値</span>
+                <input type="number" id="minInput" value="1" min="0" max="99999" class="w-full mt-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-center">
+              </div>
+              <div>
+                <span class="text-xs text-slate-400">最大値（いくつまで）</span>
+                <input type="number" id="maxInput" value="100" min="1" max="99999" class="w-full mt-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-center">
+              </div>
+            </div>
+          </div>
+
+          <!-- オプション設定 -->
+          <div class="pt-2 border-t border-slate-100 dark:border-slate-700 space-y-3">
+            <!-- 重複設定 -->
+            <label class="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors">
+              <div class="flex flex-col">
+                <span class="text-sm font-semibold">一度出た番号も出す（重複あり）</span>
+                <span class="text-xs text-slate-400">有効にすると無限に引けます</span>
+              </div>
+              <div class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="allowDuplicate" class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
+              </div>
+            </label>
+
+            <!-- サウンド・音声読み上げ -->
+            <label class="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors">
+              <div class="flex flex-col">
+                <span class="text-sm font-semibold">音声で番号を読み上げる</span>
+                <span class="text-xs text-slate-400">当選時に合成音声が発声します</span>
+              </div>
+              <div class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="enableSpeech" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
+              </div>
+            </label>
+
+            <!-- 効果音 -->
+            <label class="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors">
+              <div class="flex flex-col">
+                <span class="text-sm font-semibold">紙吹雪エフェクト</span>
+                <span class="text-xs text-slate-400">当選時にきらびやかな紙吹雪を降らせます</span>
+              </div>
+              <div class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="enableConfetti" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
+              </div>
+            </label>
+          </div>
+
+          <!-- 適用・リセット -->
+          <div class="pt-2 flex gap-3">
+            <button id="applyBtn" class="flex-grow bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 font-semibold text-sm py-2.5 rounded-xl transition-all">
+              設定を適用してリセット
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 履歴カード -->
+      <div class="flex-grow bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm flex flex-col min-h-[250px] transition-colors duration-200">
+        <div class="flex justify-between items-center mb-4">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-history text-slate-400"></i>
+            <h2 class="text-lg font-bold">抽選の履歴</h2>
+            <span id="historyCount" class="text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md font-semibold text-slate-500">0回</span>
+          </div>
+          <!-- 履歴削除ボタン -->
+          <button id="clearHistoryBtn" class="text-xs text-rose-500 hover:text-rose-600 font-semibold flex items-center gap-1 transition-colors" title="履歴をクリア">
+            <i class="fa-solid fa-trash-can"></i>
+            履歴クリア
+          </button>
+        </div>
+
+        <!-- 履歴一覧 -->
+        <div class="flex-grow overflow-y-auto pr-1" style="max-height: 250px;">
+          <div id="noHistory" class="h-full flex flex-col items-center justify-center text-slate-400 py-10">
+            <i class="fa-solid fa-box-open text-3xl mb-2"></i>
+            <span class="text-sm">履歴はまだありません</span>
+          </div>
+          <div id="historyList" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-5 lg:grid-cols-4 gap-2.5 hidden">
+            <!-- JSで動的に追加 -->
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- トースト通知 (カスタムアラート) -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white dark:bg-white dark:text-slate-800 px-6 py-3 rounded-xl shadow-xl z-50 flex items-center gap-3 transition-all duration-300 translate-y-20 opacity-0 pointer-events-none">
+    <i id="toastIcon" class="fa-solid fa-info-circle text-emerald-400"></i>
+    <span id="toastMessage" class="text-sm font-medium">メッセージ</span>
+  </div>
+
+  <script>
+    // --- 状態管理 ---
+    let state = {
+      min: 1,
+      max: 100,
+      allowDuplicate: false,
+      enableSpeech: true,
+      enableConfetti: true,
+      history: [],
+      pool: [],
+      isDrawing: false,
+      drawInterval: null,
+      theme: 'light'
+    };
+
+    // --- DOM要素 ---
+    const minInput = document.getElementById('minInput');
+    const maxInput = document.getElementById('maxInput');
+    const allowDuplicateCheck = document.getElementById('allowDuplicate');
+    const enableSpeechCheck = document.getElementById('enableSpeech');
+    const enableConfettiCheck = document.getElementById('enableConfetti');
+    const applyBtn = document.getElementById('applyBtn');
+    
+    const remainingCount = document.getElementById('remainingCount');
+    const displayContainer = document.getElementById('displayContainer');
+    const glowEffect = document.getElementById('glowEffect');
+    const subLabel = document.getElementById('subLabel');
+    const numberDisplay = document.getElementById('numberDisplay');
+    const stateBadge = document.getElementById('stateBadge');
+    const drawBtn = document.getElementById('drawBtn');
+    
+    const historyCount = document.getElementById('historyCount');
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    const noHistory = document.getElementById('noHistory');
+    const historyList = document.getElementById('historyList');
+    
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const themeIcon = document.getElementById('themeIcon');
+    
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toastMessage');
+    const toastIcon = document.getElementById('toastIcon');
+
+    // --- 音声合成の設定 ---
+    let synth = window.speechSynthesis;
+
+    // --- 初期化 ---
+    function init() {
+      // システムテーマの適用
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        state.theme = 'dark';
+        document.documentElement.classList.add('dark');
+        themeIcon.className = 'fa-solid fa-sun text-yellow-400';
+      } else {
+        state.theme = 'light';
+        document.documentElement.classList.remove('dark');
+        themeIcon.className = 'fa-solid fa-moon text-slate-600';
+      }
+
+      loadSettings();
+      resetPool();
+      updateUI();
+    }
+
+    // 設定ロード
+    function loadSettings() {
+      state.min = parseInt(minInput.value) || 1;
+      state.max = parseInt(maxInput.value) || 100;
+      state.allowDuplicate = allowDuplicateCheck.checked;
+      state.enableSpeech = enableSpeechCheck.checked;
+      state.enableConfetti = enableConfettiCheck.checked;
+    }
+
+    // プールをリセット (重複なし用の残りの数字配列を作成)
+    function resetPool() {
+      state.pool = [];
+      if (!state.allowDuplicate) {
+        for (let i = state.min; i <= state.max; i++) {
+          state.pool.push(i);
+        }
+      }
+    }
+
+    // アプリを完全に初期状態にリセット
+    function resetApp() {
+      loadSettings();
+      if (state.min > state.max) {
+        showToast("最小値は最大値より小さくしてください", "error");
+        // 入力値を戻す
+        minInput.value = state.min = 1;
+        maxInput.value = state.max = 100;
+      }
+      
+      resetPool();
+      state.history = [];
+      state.isDrawing = false;
+      if (state.drawInterval) {
+        clearInterval(state.drawInterval);
+        state.drawInterval = null;
+      }
+      
+      numberDisplay.textContent = "?";
+      subLabel.textContent = "準備完了";
+      stateBadge.textContent = "READY";
+      stateBadge.className = "mt-4 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400";
+      
+      displayContainer.classList.remove('border-emerald-500', 'dark:border-emerald-400');
+      displayContainer.classList.add('border-slate-100', 'dark:border-slate-700');
+      glowEffect.className = "absolute inset-0 rounded-full bg-emerald-500/0";
+
+      updateUI();
+      showToast("設定をリセット・適用しました！");
+    }
+
+    // UIの更新
+    function updateUI() {
+      // 残り枚数の更新
+      if (state.allowDuplicate) {
+        remainingCount.textContent = "∞";
+      } else {
+        remainingCount.textContent = `${state.pool.length} / ${state.max - state.min + 1}`;
+      }
+
+      // 履歴一覧の更新
+      historyCount.textContent = `${state.history.length}回`;
+      if (state.history.length === 0) {
+        noHistory.classList.remove('hidden');
+        historyList.classList.add('hidden');
+      } else {
+        noHistory.classList.add('hidden');
+        historyList.classList.remove('hidden');
+        
+        historyList.innerHTML = '';
+        // 履歴を新しい順に表示
+        [...state.history].reverse().forEach((num, index) => {
+          const item = document.createElement('div');
+          // 最新の数字を目立たせる
+          const isLatest = index === 0;
+          item.className = `flex items-center justify-center h-11 rounded-xl text-sm font-bold border transition-all ${
+            isLatest 
+              ? 'bg-gradient-to-tr from-emerald-500 to-teal-500 text-white border-transparent shadow-md scale-105' 
+              : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`;
+          
+          item.innerHTML = `
+            <div class="flex flex-col items-center">
+              <span class="text-xs ${isLatest ? 'text-emerald-100' : 'text-slate-400'} leading-none mb-0.5">${state.history.length - index}回目</span>
+              <span class="text-base">${num}</span>
+            </div>
+          `;
+          historyList.appendChild(item);
+        });
+      }
+
+      // ボタンの状態
+      if (state.isDrawing) {
+        drawBtn.disabled = true;
+        drawBtn.className = "w-full bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-bold text-xl py-5 rounded-2xl cursor-not-allowed flex items-center justify-center gap-3";
+        drawBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i><span>抽選中...</span>`;
+      } else {
+        drawBtn.disabled = false;
+        drawBtn.className = "w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold text-xl py-5 rounded-2xl shadow-lg shadow-emerald-500/20 active:scale-98 transition-all flex items-center justify-center gap-3 cursor-pointer";
+        drawBtn.innerHTML = `<i class="fa-solid fa-play"></i><span>くじを引く！</span>`;
+      }
+    }
+
+    // --- トースト表示 ---
+    function showToast(message, type = "success") {
+      toastMessage.textContent = message;
+      if (type === "success") {
+        toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
+      } else if (type === "error") {
+        toastIcon.className = "fa-solid fa-circle-exclamation text-rose-500 text-lg";
+      }
+      
+      toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+      }, 2500);
+    }
+
+    // --- 抽選ロジック ---
+    function startDraw() {
+      if (state.isDrawing) return;
+
+      // プールチェック (重複なし時の空チェック)
+      if (!state.allowDuplicate && state.pool.length === 0) {
+        showToast("すべての番号を引き終えました！設定からリセットしてください。", "error");
+        return;
+      }
+
+      state.isDrawing = true;
+      updateUI();
+
+      subLabel.textContent = "抽選中...";
+      stateBadge.textContent = "SHUFFLING";
+      stateBadge.className = "mt-4 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400";
+      
+      // コンテナのアニメーション強化
+      displayContainer.classList.add('scale-105');
+      glowEffect.className = "absolute inset-0 rounded-full bg-amber-500/10 animate-ping";
+
+      // シャッフル中サウンド (Web Audio API を使って簡単な電子音を出す)
+      playBeepLoop(12, 100);
+
+      // 高速シャッフル表示
+      let speed = 60; // ミリ秒
+      state.drawInterval = setInterval(() => {
+        const tempNum = Math.floor(Math.random() * (state.max - state.min + 1)) + state.min;
+        numberDisplay.textContent = tempNum;
+      }, speed);
+
+      // 1.5秒後に結果決定
+      setTimeout(() => {
+        clearInterval(state.drawInterval);
+        state.drawInterval = null;
+        finishDraw();
+      }, 1500);
+    }
+
+    function finishDraw() {
+      let winningNumber;
+
+      if (state.allowDuplicate) {
+        winningNumber = Math.floor(Math.random() * (state.max - state.min + 1)) + state.min;
+      } else {
+        // 残りプールからランダム抽出
+        const randomIndex = Math.floor(Math.random() * state.pool.length);
+        winningNumber = state.pool[randomIndex];
+        // プールから削除
+        state.pool.splice(randomIndex, 1);
+      }
+
+      state.history.push(winningNumber);
+      state.isDrawing = false;
+
+      // ディスプレイ表示
+      numberDisplay.textContent = winningNumber;
+      subLabel.textContent = `${state.history.length}回目の番号`;
+      stateBadge.textContent = "WINNER!";
+      stateBadge.className = "mt-4 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500 text-white";
+      
+      displayContainer.classList.remove('scale-105');
+      displayContainer.classList.add('border-emerald-500', 'dark:border-emerald-400');
+      glowEffect.className = "absolute inset-0 rounded-full bg-emerald-500/20 animate-pulse";
+
+      // ファンファーレ音
+      playFanfare();
+
+      // 紙吹雪演出
+      if (state.enableConfetti) {
+        triggerConfetti();
+      }
+
+      // 音声読み上げ
+      if (state.enableSpeech) {
+        speakNumber(winningNumber);
+      }
+
+      updateUI();
+    }
+
+    // --- 効果音生成 (Web Audio API) ---
+    function playBeepLoop(times, interval) {
+      let count = 0;
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      
+      const timer = setInterval(() => {
+        if (count >= times) {
+          clearInterval(timer);
+          return;
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400 + (count * 40), audioCtx.currentTime); // どんどん高くなるピッチ
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+        
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+        count++;
+      }, interval);
+    }
+
+    function playFanfare() {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // ド・ミ・ソ・ド
+      
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.1);
+        gain.gain.setValueAtTime(0, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + i * 0.1 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.1 + 0.4);
+        
+        osc.start(audioCtx.currentTime + i * 0.1);
+        osc.stop(audioCtx.currentTime + i * 0.1 + 0.4);
+      });
+    }
+
+    // --- 音声読み上げ ---
+    function speakNumber(number) {
+      if (!synth) return;
+      // すべての発声をキャンセルして最新を優先
+      synth.cancel();
+      const text = `${number}番`;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'ja-JP';
+      utterance.rate = 1.1; // 少し早口で元気よく
+      synth.speak(utterance);
+    }
+
+    // --- 紙吹雪演出 ---
+    function triggerConfetti() {
+      // 左右から豪華に打ち上げる
+      const duration = 1.5 * 1000;
+      const end = Date.now() + duration;
+
+      (function frame() {
+        confetti({
+          particleCount: 3,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0, y: 0.8 },
+          colors: ['#10b981', '#06b6d4', '#3b82f6', '#f59e0b', '#ec4899']
+        });
+        confetti({
+          particleCount: 3,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1, y: 0.8 },
+          colors: ['#10b981', '#06b6d4', '#3b82f6', '#f59e0b', '#ec4899']
+        });
+
+        if (Date.now() < end) {
+          requestAnimationFrame(frame);
+        }
+      }());
+    }
+
+    // --- イベントリスナー ---
+    
+    // 引くボタン
+    drawBtn.addEventListener('click', startDraw);
+    
+    // キーボードのスペースキーでも引けるようにする
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !state.isDrawing) {
+        // 入力フィールドフォーカス時は除外
+        if (document.activeElement.tagName !== 'INPUT') {
+          e.preventDefault();
+          startDraw();
+        }
+      }
+    });
+
+    // 設定適用・リセットボタン
+    applyBtn.addEventListener('click', resetApp);
+
+    // 履歴クリアボタン
+    clearHistoryBtn.addEventListener('click', () => {
+      state.history = [];
+      resetPool();
+      updateUI();
+      showToast("履歴をクリアしました");
+    });
+
+    // テーマ切り替え
+    themeToggleBtn.addEventListener('click', () => {
+      if (state.theme === 'light') {
+        state.theme = 'dark';
+        document.documentElement.classList.add('dark');
+        themeIcon.className = 'fa-solid fa-sun text-yellow-400';
+        showToast("ダークモードに切り替えました");
+      } else {
+        state.theme = 'light';
+        document.documentElement.classList.remove('dark');
+        themeIcon.className = 'fa-solid fa-moon text-slate-600';
+        showToast("ライトモードに切り替えました");
+      }
+    });
+
+    // 起動
+    window.onload = init;
+  </script>
+</body>
+</html>
